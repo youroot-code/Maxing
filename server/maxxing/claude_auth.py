@@ -52,10 +52,16 @@ def plan_name(creds: object = None) -> str | None:
 
 def auth_method() -> tuple[str | None, str]:
     """(method, detail) without any network call."""
+    cfg = config.load_config()
+    base_url = (cfg.get("anthropic_base_url") or os.environ.get("ANTHROPIC_BASE_URL") or "").strip()
+    is_omni = bool(base_url)
+    omni_label = f"OmniRoute ({base_url})" if is_omni else ""
     if config.get_secret("claude_oauth_token"):
-        return "oauth_token", "Long-lived token stored in Harness Maxxing"
+        return "oauth_token", (f"Long-lived token via {omni_label}" if is_omni else "Long-lived token stored in Harness Maxxing")
     if config.get_secret("anthropic_api_key"):
-        return "api_key", "API key stored in Harness Maxxing"
+        return "api_key", (f"API key via {omni_label}" if is_omni else "API key stored in Harness Maxxing")
+    if is_omni:
+        return "api_key", f"Connected via {omni_label}"
     f = credentials_file()
     if f.is_file():
         sub = plan_name()

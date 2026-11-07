@@ -66,7 +66,10 @@ def auth_status() -> dict:
 
 
 # ---- test call -----------------------------------------------------------------------------
-def run_test(model: str = TEST_MODEL, source: str = "test", timeout_s: int = TEST_TIMEOUT_S) -> dict:
+def run_test(model: str | None = None, source: str = "test", timeout_s: int = TEST_TIMEOUT_S) -> dict:
+    if not model:
+        cfg = config.load_config()
+        model = (cfg.get("default_model") or "").strip() or TEST_MODEL
     """Real one-line call through the CLI -> {ok, model, ms, error?} (also remembered)."""
     t0 = time.time()
     out: dict = {"ok": False, "model": model, "ms": 0}
@@ -163,6 +166,7 @@ async def status():
     version = await asyncio.to_thread(claude_version)
     return {"installed": bool(await asyncio.to_thread(_resolved_bin)), "version": version,
             "auth": await asyncio.to_thread(auth_status),
+            "anthropic_base_url": cfg.get("anthropic_base_url") or "",
             "default_model": cfg.get("default_model") or "",
             "permission_mode": cfg.get("permission_mode") or "bypass",
             "auto_compact_tokens": config.int_setting(cfg, "auto_compact_tokens"),
@@ -179,6 +183,7 @@ async def status():
 class AuthIn(BaseModel):
     kind: Literal["oauth_token", "api_key"]
     value: str
+    base_url: str | None = None
 
 
 @router.post("/auth")
@@ -187,6 +192,8 @@ async def set_auth(body: AuthIn):
     # printable ASCII only: a NUL byte made every turn fail to start, a lone surrogate could not be stored
     if len(value) < 10 or any(c.isspace() for c in value) or not (value.isascii() and value.isprintable()):
         raise HTTPException(400, detail={"error": "invalid", "message": "This does not look like a token"})
+    if body.base_url is not None:
+        config.update_config(anthropic_base_url=body.base_url.strip())
     for kind, name in SECRET_FOR.items():               # one stored credential at a time
         config.set_secret(name, value if kind == body.kind else None)
     res = await asyncio.to_thread(run_test)
@@ -197,6 +204,7 @@ async def set_auth(body: AuthIn):
 async def delete_auth():
     for name in SECRET_FOR.values():
         config.set_secret(name, None)
+    config.update_config(anthropic_base_url="")
     claude_auth.forget()
     return {"ok": True}
 
@@ -210,6 +218,7 @@ MODEL_RE = re.compile(r"[A-Za-z0-9._:\[\]/@-]{1,100}")
 
 
 class SettingsIn(BaseModel):
+    anthropic_base_url: str | None = None
     default_model: str | None = None
     permission_mode: str | None = None
     auto_compact_tokens: int | None = Field(None, ge=0, le=2_000_000)
@@ -225,6 +234,8 @@ class SettingsIn(BaseModel):
 @router.put("/settings")
 async def settings(body: SettingsIn):
     changes: dict = {}
+    if body.anthropic_base_url is not None:
+        changes["anthropic_base_url"] = body.anthropic_base_url.strip()
     if body.default_model is not None:
         model = body.default_model.strip()
         if model and not MODEL_RE.fullmatch(model):     # a NUL or a newline here broke every new session

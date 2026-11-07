@@ -3,7 +3,7 @@ import { useClaudeSettings, useClaudeStatus } from '@/lib/queries'
 import type { PermissionMode } from '@/lib/types'
 import { useLang, useT } from '@/i18n'
 import { fmtDate } from '@/lib/format'
-import { Badge, FormField, Select, Skeleton, Switch } from '@/components/ui'
+import { Badge, FormField, Input, Select, Skeleton, Switch } from '@/components/ui'
 import { OptionCard, SettingRow } from '../common'
 
 const CLI_DEFAULT = '__cli_default__'
@@ -37,13 +37,30 @@ export function ClaudeDefaults() {
   return (
     <div className="grid gap-6">
       <FormField label={t('cdef.defaultModel')} hint={t('cdef.defaultModelHint')}>
-        <Select
-          value={s.default_model || CLI_DEFAULT}
-          onValueChange={(v) => save.mutate({ default_model: v === CLI_DEFAULT ? '' : v })}
-          options={[{ value: CLI_DEFAULT, label: t('cdef.cliDefault') }, ...models.map((m) => ({ value: m.id, label: m.label || m.id }))]}
-          disabled={save.isPending}
-          className="sm:max-w-sm"
-        />
+        <div className="flex flex-col sm:flex-row gap-2 sm:max-w-xl">
+          <Select
+            value={models.some((m) => m.id === s.default_model) ? s.default_model : s.default_model ? '__custom__' : CLI_DEFAULT}
+            onValueChange={(v) => {
+              if (v !== '__custom__') {
+                save.mutate({ default_model: v === CLI_DEFAULT ? '' : v })
+              }
+            }}
+            options={[
+              { value: CLI_DEFAULT, label: t('cdef.cliDefault') },
+              ...models.map((m) => ({ value: m.id, label: m.label || m.id })),
+              { value: '__custom__', label: 'Custom / OmniRoute model…' },
+            ]}
+            disabled={save.isPending}
+            className="sm:max-w-xs"
+          />
+          <Input
+            value={s.default_model}
+            onChange={(e) => save.mutate({ default_model: e.target.value.trim() })}
+            placeholder="e.g. deepseek-chat, gpt-4o, claude-opus-5-5"
+            className="flex-1"
+            disabled={save.isPending}
+          />
+        </div>
       </FormField>
       <FormField label={t('cdef.autoCompact')} hint={t('cdef.autoCompactHint')}>
         <Select

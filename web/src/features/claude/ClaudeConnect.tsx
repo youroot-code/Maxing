@@ -1,11 +1,11 @@
 import * as React from 'react'
-import { KeyRound, PlugZap, RefreshCw, Terminal, Trash2 } from 'lucide-react'
+import { KeyRound, Network, PlugZap, RefreshCw, Terminal, Trash2 } from 'lucide-react'
 import { useClaudeAuth, useClaudeAuthRemove, useClaudeStatus, useClaudeTest } from '@/lib/queries'
 import { errorMessage } from '@/lib/api'
 import { fmtRelative } from '@/lib/format'
 import type { ClaudeAuthMethod, ClaudeTestResult } from '@/lib/types'
 import { useLang, useT, type TKey } from '@/i18n'
-import { Badge, Button, CodeBlock, FormField, SecretInput, Sensitive, Skeleton, Tabs, TabsContent, TabsList, TabsTrigger, confirm } from '@/components/ui'
+import { Badge, Button, CodeBlock, FormField, Input, SecretInput, Sensitive, Skeleton, Tabs, TabsContent, TabsList, TabsTrigger, confirm } from '@/components/ui'
 import { Callout, Steps } from '../common'
 
 const METHOD: Record<NonNullable<ClaudeAuthMethod>, TKey> = {
@@ -56,6 +56,7 @@ export function ClaudeStatusCard({ onReplace }: { onReplace?: () => void }) {
       >
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
           {s.auth.method && <Badge variant="outline">{t(METHOD[s.auth.method])}</Badge>}
+          {s.anthropic_base_url && <Badge variant="secondary">Gateway: {s.anthropic_base_url}</Badge>}
           {s.version && <span>Claude Code {s.version}</span>}
           {s.auth.detail && (
             <span>
@@ -99,7 +100,9 @@ export function ClaudeStatusCard({ onReplace }: { onReplace?: () => void }) {
 /** Paste a `claude setup-token` OAuth token or an Anthropic API key, then the server tests it. */
 export function ClaudeAuthForm({ onDone }: { onDone?: () => void }) {
   const t = useT()
-  const [kind, setKind] = React.useState<'oauth_token' | 'api_key'>('oauth_token')
+  const { data: s } = useClaudeStatus()
+  const [kind, setKind] = React.useState<'oauth_token' | 'api_key' | 'omniroute'>('oauth_token')
+  const [baseUrl, setBaseUrl] = React.useState(s?.anthropic_base_url || 'http://localhost:20128')
   const [value, setValue] = React.useState('')
   const [error, setError] = React.useState<string | null>(null)
   const auth = useClaudeAuth()
@@ -108,8 +111,11 @@ export function ClaudeAuthForm({ onDone }: { onDone?: () => void }) {
     const v = value.trim()
     if (!v) return setError(t('claude.pasteFirst'))
     setError(null)
+    const payload = kind === 'omniroute'
+      ? { kind: 'api_key' as const, value: v, base_url: baseUrl.trim() || 'http://localhost:20128' }
+      : { kind, value: v, base_url: '' }
     auth.mutate(
-      { kind, value: v },
+      payload,
       {
         onSuccess: (r) => {
           if (r.ok) {
@@ -132,6 +138,9 @@ export function ClaudeAuthForm({ onDone }: { onDone?: () => void }) {
         </TabsTrigger>
         <TabsTrigger value="api_key" className="flex-1">
           <KeyRound /> {t('claude.tabApiKey')}
+        </TabsTrigger>
+        <TabsTrigger value="omniroute" className="flex-1">
+          <Network /> {t('claude.tabOmniroute')}
         </TabsTrigger>
       </TabsList>
       <form onSubmit={submit} className="mt-4 grid gap-5" noValidate>
@@ -165,8 +174,22 @@ export function ClaudeAuthForm({ onDone }: { onDone?: () => void }) {
             ]}
           />
         </TabsContent>
-        <FormField label={kind === 'oauth_token' ? t('claude.tokenLabel') : t('claude.keyLabel')} error={error || undefined} hint={t('claude.storedHint')}>
-          <SecretInput value={value} onChange={(e) => setValue(e.target.value)} placeholder={kind === 'oauth_token' ? 'sk-ant-oat01-…' : 'sk-ant-api03-…'} />
+        <TabsContent value="omniroute" className="mt-0 grid gap-4">
+          <p className="text-sm text-muted-foreground">{t('claude.omnirouteIntro')}</p>
+          <FormField label={t('claude.baseUrlLabel')} hint={t('claude.baseUrlHint')}>
+            <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="http://localhost:20128" />
+          </FormField>
+        </TabsContent>
+        <FormField
+          label={kind === 'oauth_token' ? t('claude.tokenLabel') : kind === 'omniroute' ? t('claude.omniKeyLabel') : t('claude.keyLabel')}
+          error={error || undefined}
+          hint={kind === 'omniroute' ? t('claude.omniKeyHint') : t('claude.storedHint')}
+        >
+          <SecretInput
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder={kind === 'oauth_token' ? 'sk-ant-oat01-…' : kind === 'omniroute' ? 'omni-… or sk-ant-…' : 'sk-ant-api03-…'}
+          />
         </FormField>
         <div className="flex flex-wrap items-center gap-3">
           <Button type="submit" loading={auth.isPending}>

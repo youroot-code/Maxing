@@ -38,7 +38,7 @@ COMPACT_WINDOW_MIN, COMPACT_WINDOW_MAX = 100000, 1000000     # the range Claude 
 # first event, and ~900 fewer prompt tokens per call; the 1-hour prompt cache of subscriptions is unchanged.
 QUIET_START_ENV = "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"
 FORWARDED = ("MAXXING_STATE", "MAXXING_LISTEN_PORT", "MAXXING_CLAUDE_BIN", "MAXXING_SPAWN", "MAXXING_TELEGRAM_API",
-             "FAKE_CLAUDE_DIR", "LANG", "LC_ALL") + TUNING_ENV
+             "FAKE_CLAUDE_DIR", "LANG", "LC_ALL", "ANTHROPIC_BASE_URL") + TUNING_ENV
 
 
 # ---- environment ---------------------------------------------------------------------------
@@ -77,7 +77,7 @@ def claude_bin() -> str:
 _RESERVED = {"PATH", "HOME", "USER", "LOGNAME", "SHELL", "PWD", "TERM", "LANG", "LC_ALL", "TZ",   # = vault.RESERVED
              "HOSTNAME", "TMPDIR", "PYTHONPATH", "LD_PRELOAD", "LD_LIBRARY_PATH",
              "LD_AUDIT", "BASH_ENV", "ENV", "PROMPT_COMMAND", "NODE_OPTIONS", "NODE_PATH",
-             "PYTHONSTARTUP", "PYTHONHOME", "GIT_SSH_COMMAND", "GIT_EXEC_PATH", "ANTHROPIC_BASE_URL"}
+             "PYTHONSTARTUP", "PYTHONHOME", "GIT_SSH_COMMAND", "GIT_EXEC_PATH"}
 
 
 def _exposed_vault(secrets: dict) -> dict[str, str]:
@@ -96,11 +96,15 @@ def _exposed_vault(secrets: dict) -> dict[str, str]:
 def auth_env(secrets: dict | None = None) -> dict[str, str]:
     """Claude credentials stored in secrets.json + the user's vault entries flagged `expose`."""
     s = secrets if secrets is not None else config.load_secrets()
+    cfg = config.load_config()
     out = _exposed_vault(s)
     if s.get("claude_oauth_token"):
         out["CLAUDE_CODE_OAUTH_TOKEN"] = str(s["claude_oauth_token"])
     if s.get("anthropic_api_key"):
         out["ANTHROPIC_API_KEY"] = str(s["anthropic_api_key"])
+    base_url = (cfg.get("anthropic_base_url") or os.environ.get("ANTHROPIC_BASE_URL") or "").strip()
+    if base_url:
+        out["ANTHROPIC_BASE_URL"] = base_url
     return out
 
 

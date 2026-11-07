@@ -40,6 +40,7 @@ export type ClaudeStatus = {
   version: string | null
   /** `ok` reflects the last REAL call (turn / test / background check); `checked_at` null = not verified yet. */
   auth: { ok: boolean; method: ClaudeAuthMethod; detail: string | null; checked_at?: number | null; error?: string | null }
+  anthropic_base_url?: string
   default_model: string
   permission_mode: PermissionMode
   /** A turn ending above this context (tokens) is followed by an automatic compaction; 0 = off. */
@@ -65,10 +66,10 @@ export type ClaudeAutoUpdate = {
   latest: string | null
   last: { from: string; to: string; at: number; ok: boolean; error: string | null } | null
 }
-export type ClaudeAuthBody = { kind: 'oauth_token' | 'api_key'; value: string }
+export type ClaudeAuthBody = { kind: 'oauth_token' | 'api_key'; value: string; base_url?: string }
 export type ClaudeAuthResult = { ok: boolean; error?: string }
 export type ClaudeTestResult = { ok: boolean; model: string; ms: number; error?: string }
-export type ClaudeSettingsBody = { default_model?: string; permission_mode?: PermissionMode; auto_compact_tokens?: number; idle_compact_tokens?: number; idle_compact_after_s?: number; smart_resume_tokens?: number; protect_secrets?: boolean; short_titles?: boolean; short_titles_model?: boolean; claude_auto_update?: boolean }
+export type ClaudeSettingsBody = { anthropic_base_url?: string; default_model?: string; permission_mode?: PermissionMode; auto_compact_tokens?: number; idle_compact_tokens?: number; idle_compact_after_s?: number; smart_resume_tokens?: number; protect_secrets?: boolean; short_titles?: boolean; short_titles_model?: boolean; claude_auto_update?: boolean }
 
 /* ---------------------------------------------------------------- Workspace */
 export type Topic = {

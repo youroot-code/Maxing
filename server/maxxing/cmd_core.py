@@ -668,14 +668,20 @@ def uv_bin() -> str | None:
 
 def claude_auth() -> tuple[str | None, str]:
     """-> (method, detail). method None = not signed in."""
+    cfg = config.load_config()
+    base_url = (cfg.get("anthropic_base_url") or os.environ.get("ANTHROPIC_BASE_URL") or "").strip()
+    is_omni = bool(base_url)
+    omni_label = f"OmniRoute ({base_url})" if is_omni else ""
     if config.get_secret("claude_oauth_token"):
-        return "oauth_token", "long-lived token stored in Harness Maxxing"
+        return "oauth_token", (f"long-lived token via {omni_label}" if is_omni else "long-lived token stored in Harness Maxxing")
     if config.get_secret("anthropic_api_key"):
-        return "api_key", "API key stored in Harness Maxxing"
+        return "api_key", (f"API key via {omni_label}" if is_omni else "API key stored in Harness Maxxing")
     if os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
         return "oauth_token", "CLAUDE_CODE_OAUTH_TOKEN in the environment"
     if os.environ.get("ANTHROPIC_API_KEY"):
         return "api_key", "ANTHROPIC_API_KEY in the environment"
+    if is_omni:
+        return "api_key", f"Connected via {omni_label}"
     cred = config.claude_dir() / ".credentials.json"
     if cred.is_file():
         return "credentials", f"Claude CLI sign-in ({cred})"
@@ -848,6 +854,10 @@ def check_claude_auth(live: bool = False) -> Check:
     b = claude_bin()
     env = dict(os.environ)
     tok, key = config.get_secret("claude_oauth_token"), config.get_secret("anthropic_api_key")
+    cfg = config.load_config()
+    base_url = (cfg.get("anthropic_base_url") or os.environ.get("ANTHROPIC_BASE_URL") or "").strip()
+    if base_url:
+        env["ANTHROPIC_BASE_URL"] = base_url
     if tok:
         env["CLAUDE_CODE_OAUTH_TOKEN"] = tok
     if key:

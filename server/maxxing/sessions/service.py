@@ -30,7 +30,7 @@ BACK_SCAN_MAX = 64 * 1024 * 1024      # max bytes scanned by one read_back call 
 TASK_START_SCAN_MAX = 32 * 1024 * 1024  # how far back read_back looks for the task_started of a task in its page
 STOP_WAIT_S = 10.0
 KNOWN_MODELS = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-4-5-20251001", "claude-fable-5-1"]
-_MODEL_RE = re.compile(rb'"model"\s*:\s*"(claude-[a-z0-9.-]+)"')
+_MODEL_RE = re.compile(rb'"model"\s*:\s*"([A-Za-z0-9._:@/\[\]-]+)"')
 # a model id given by a client: passed to `claude --model`, so no option, no NUL, no control character
 _MODEL_ID = re.compile(r"[A-Za-z0-9._:@/\[\]][A-Za-z0-9._:@/\[\]-]{0,99}")
 
@@ -40,7 +40,7 @@ def _check_model(model: str | None) -> str:
     if model and not _MODEL_ID.fullmatch(model):
         raise SessionError(400, "bad_model", "Invalid model id")
     return model
-_WINDOW_RE = re.compile(rb'"(claude-[a-z0-9.-]+)"\s*:\s*\{[^{}]*?"contextWindow"\s*:\s*(\d+)')
+_WINDOW_RE = re.compile(rb'"([A-Za-z0-9._:@/\[\]-]+)"\s*:\s*\{[^{}]*?"contextWindow"\s*:\s*(\d+)')
 
 
 class SessionError(Exception):
@@ -987,12 +987,13 @@ _models_cache: tuple[float, list[dict]] = (0.0, [])
 
 
 def _label(mid: str) -> str:
-    parts = mid.split("-")[1:]
-    if not parts:
-        return mid
-    fam = parts[0].capitalize()
-    nums = [p for p in parts[1:] if p.isdigit() and len(p) < 4]
-    return f"{fam} {'.'.join(nums)}".strip()
+    if mid.startswith("claude-"):
+        parts = mid.split("-")[1:]
+        if parts:
+            fam = parts[0].capitalize()
+            nums = [p for p in parts[1:] if p.isdigit() and len(p) < 4]
+            return f"{fam} {'.'.join(nums)}".strip()
+    return mid
 
 
 _models_seen: dict[str, tuple[int, int, set[str]]] = {}    # session -> (log inode, bytes scanned, models seen)
